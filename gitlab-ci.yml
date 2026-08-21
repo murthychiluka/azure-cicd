@@ -1,0 +1,57 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  REGISTRY: narnii.azurecr.io
+  APP_NAME: cloud-app
+  TAG: $CI_PIPELINE_ID
+
+# 🐳 BUILD & PUSH IMAGE
+build:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+
+  script:
+    - echo "$ACR_PASSWORD" | docker login $REGISTRY -u "$ACR_USERNAME" --password-stdin
+    - docker build -t $REGISTRY/$APP_NAME:$TAG -f myapp/Dockerfile myapp
+    - docker push $REGISTRY/$APP_NAME:$TAG
+
+  only:
+    - main
+
+
+# 🚀 DEPLOY TO AWS EC2
+deploy:
+  stage: deploy
+  image: alpine:latest
+
+  before_script:
+    - apk add --no-cache openssh-client
+
+    # Save EC2 private key securely
+    - echo "$EC2_SSH_KEY" > ec2_key.pem
+    - chmod 600 ec2_key.pem
+
+  script:
+    - ssh -i ec2_key.pem -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << EOF
+        REGISTRY=$REGISTRY
+        APP_NAME=$APP_NAME
+        TAG=$TAG
+
+        echo "$ACR_PASSWORD" | docker login $REGISTRY -u "$ACR_USERNAME" --password-stdin
+
+        docker pull $REGISTRY/$APP_NAME:$TAG
+
+        docker stop $APP_NAME || true
+        docker rm $APP_NAME || true
+
+        docker run -d -p 80:80 --name $APP_NAME $REGISTRY/$APP_NAME:$TAG
+
+        docker image prune -f
+      EOF
+
+  only:
+    - main
