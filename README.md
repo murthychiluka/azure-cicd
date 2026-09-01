@@ -18,5 +18,6 @@ tar zxvf vsts-agent-linux-x64-4.272.0.tar.gz
 
 azurecicd
 secrets
+ec2-user
 
 
