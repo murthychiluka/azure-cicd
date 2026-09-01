@@ -16,7 +16,7 @@ tar zxvf vsts-agent-linux-x64-4.272.0.tar.gz
 ./ run.sh
 
 ```text
-Absolutely. This was a useful end-to-end CI/CD troubleshooting exercise. The most important learning points from what you just went through are these:
+ This was a useful end-to-end CI/CD troubleshooting exercise. The most important learning points from what I just went through are these:
 
 1. Separate CI/CD stages clearly
 
