@@ -33,8 +33,8 @@ jobs:
         docker build -t $REGISTRY/$APP_NAME:$TAG -f myapp/Dockerfile myapp
         docker push $REGISTRY/$APP_NAME:$TAG
 
-    # 🚀 Deploy to Azure VM via SSH
-    - name: Deploy to Azure VM
+    # 🚀 Deploy to EC2 via SSH
+    - name: Deploy to EC2
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.VM_HOST }}
@@ -42,7 +42,7 @@ jobs:
         #password: ${{ secrets.SSH_PRIVATE_KEY }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
-          set +e
+          set -e
 
           REGISTRY=murthy.azurecr.io
           APP_NAME=cloud-app
