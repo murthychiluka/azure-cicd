@@ -6,7 +6,7 @@ on:
       - main
 
 env:
-  REGISTRY: narni.azurecr.io
+  REGISTRY: murthy.azurecr.io
   APP_NAME: cloud-app
   TAG: ${{ github.run_number }}
 
@@ -44,7 +44,7 @@ jobs:
         script: |
           set +e
 
-          REGISTRY=narni.azurecr.io
+          REGISTRY=murthy.azurecr.io
           APP_NAME=cloud-app
           TAG=${{ github.run_number }}
 
