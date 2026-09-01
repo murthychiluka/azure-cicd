@@ -3,7 +3,7 @@ stages:
   - deploy
 
 variables:
-  REGISTRY: narnii.azurecr.io
+  REGISTRY: murthy.azurecr.io
   APP_NAME: cloud-app
   TAG: $CI_PIPELINE_ID
 
