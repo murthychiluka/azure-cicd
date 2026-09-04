@@ -1,0 +1,39 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+jobs:
+
+# -------------------------
+# JOB 1
+# -------------------------
+- job: Build
+
+  steps:
+  - script: |
+      mkdir -p $(Build.ArtifactStagingDirectory)
+      echo "Build completed" > $(Build.ArtifactStagingDirectory)/test.txt
+
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifact: 'build-output'
+
+
+# -------------------------
+# JOB 2
+# -------------------------
+- job: Deploy
+
+  dependsOn: Build
+
+  steps:
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      artifact: 'build-output'
+      path: '$(Pipeline.Workspace)/build-output'
+
+  - script: |
+      cat $(Pipeline.Workspace)/build-output/test.txt
