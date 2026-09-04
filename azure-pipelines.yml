@@ -1,63 +1,138 @@
 trigger:
-- main  # Or 'master' if that's your default branch
+- main
 
 variables:
-- group: variablecall  # Contains ACR_USERNAME and ACR_PASSWORD
+- group: variablecall
+
 - name: tag
   value: 'latest'
+
 - name: app-name
   value: 'cloud-app'
+
+- name: acrName
+  value: 'murthy'
+
 - name: acrrepo
-  value: 'narni.azurecr.io'
-- name: acrServiceConnection
-  value: 'veeranarni'  # Name of ACR service connection in DevOps
+  value: 'murthy.azurecr.io'
+
+- name: azureServiceConnection
+  value: 'azureconnect'
+
 - name: sshConnection
-  value: 'avmconnect'             # Name of SSH service connection
+  value: 'sshconnect'
+
 
 pool:
-  name: 'vardhan'  # Self-hosted agent pool
-  #vmImage: 'ubuntu-latest'
+  name: 'murthy'
+  # vmImage: 'ubuntu-latest'
 
 steps:
-# Step 1: Docker Build and Push
-- task: Docker@2
-  displayName: 'Build and Push Docker Image to ACR'
-  inputs:
-    containerRegistry: '$(acrServiceConnection)'
-    repository: $(app-name)
-    command: 'buildAndPush'
-    Dockerfile: '**/Dockerfile'
-    tags: |
-      $(tag)
 
-# Step 2: SSH into VM and Run Docker Image
+# ==========================================================
+# STEP 1
+# Azure DevOps Agent → WIF → ACR
+# ==========================================================
+
+- task: AzureCLI@2
+  displayName: 'Build and Push Image to ACR'
+  inputs:
+    azureSubscription: '$(azureServiceConnection)'
+    scriptType: bash
+    scriptLocation: inlineScript
+    inlineScript: |
+
+      echo "Azure authentication"
+      az account show
+
+      echo "Login to ACR"
+      az acr login --name $(acrName)
+
+      echo "Build Docker image"
+      docker build \
+        -t $(acrrepo)/$(app-name):$(tag) .
+
+      echo "Push Docker image"
+      docker push \
+        $(acrrepo)/$(app-name):$(tag)
+
+      echo "Image pushed successfully"
+
+
+# ==========================================================
+# STEP 2
+# Azure DevOps → SSH → AWS EC2
+# =========================================================
+
 - task: SSH@0
-  displayName: 'Run Docker Image on Azure VM'
+  displayName: 'Deploy Application to EC2'
   inputs:
     sshEndpoint: '$(sshConnection)'
     runOptions: 'commands'
     commands: |
-      set +e  # Allow non-zero exit codes so warnings don't fail the task
+      echo "Login to ACR"
 
-      echo "$(ACR_PASSWORD)" | docker login $(acrrepo) -u "$(ACR_USERNAME)" --password-stdin 2>/dev/null
-      echo "Logged into ACR"
+      mkdir -p /tmp/docker-config
 
-      echo "Pulling image..."
-      docker pull $(acrrepo)/$(app-name):latest
+      if printf '%s\n' '$(ACR_PASSWORD)' | docker --config /tmp/docker-config login murthy.azurecr.io --username '$(ACR_USERNAME)' --password-stdin 2>/dev/null; then
+        echo "ACR login successful"
+      else
+        echo "ACR login failed"
+        exit 1
+      fi
 
-      echo "Stopping old container..."
+      echo "Pulling image"
+      docker --config /tmp/docker-config pull murthy.azurecr.io/$(app-name):$(tag)
+
+      echo "Stopping old container"
       docker stop $(app-name) 2>/dev/null || true
+
+      echo "Removing old container"
       docker rm $(app-name) 2>/dev/null || true
+  # displayName: 'Deploy Application to EC2'
+  # inputs:
+  #   sshEndpoint: '$(sshConnection)'
+  #   runOptions: 'commands'
+  #   commands: |
+  #     echo "Login to ACR"
+  #     printf '%s\n' '$(ACR_PASSWORD)' | docker login murthy.azurecr.io --username '$(ACR_USERNAME)' --password-stdin
 
-      echo "Running container..."
-      docker run -d -p 80:80 --name $(app-name) $(acrrepo)/$(app-name):latest
+  #     echo "Pulling image"
+  #     docker pull murthy.azurecr.io/$(app-name):$(tag)
 
-      echo "Deployment complete."
+  #     echo "Stopping old container"
+  #     docker stop $(app-name) 2>/dev/null || true
+  #     docker rm $(app-name) 2>/dev/null || true
+       
+  # displayName: 'Deploy Application to EC2'
+  # inputs:
+  #   sshEndpoint: '$(sshConnection)'
+  #   runOptions: 'commands'
+  #   commands: |
+  #     echo "Login to ACR"
 
+  #     echo "$ACR_PASSWORD" | docker login \
+  #       $(acrrepo) \
+  #       --username "$ACR_USERNAME" \
+  #       --password-stdin
 
+  #     echo "Pulling image..."
 
+  #     docker pull $(acrrepo)/$(app-name):$(tag)
 
+  #     echo "Stopping old container..."
 
+  #     docker stop $(app-name) 2>/dev/null || true
+  #     docker rm $(app-name) 2>/dev/null || true
 
+  #     echo "Running container..."
 
+  #     docker run -d \
+  #       -p 80:80 \
+  #       --name $(app-name) \
+  #       $(acrrepo)/$(app-name):$(tag)
 
+  #     echo "Deployment complete."
+  # env:
+  #   ACR_USERNAME: $(ACR_USERNAME)
+  #   ACR_PASSWORD: $(ACR_PASSWORD)
